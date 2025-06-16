@@ -1,0 +1,237 @@
+Полный рабочий пример системы учета партнеров для компании «Комфорт»
+Шаг 1. Установка необходимых программ
+Установите Node.js (если еще не установлен).
+Установите PostgreSQL и создайте базу данных.
+Шаг 2. Создание базы данных PostgreSQL
+Откройте командную строку или pgAdmin и выполните:
+
+sql
+Копировать код
+-- Создайте базу данных
+CREATE DATABASE comfort_db;
+
+-- Подключитесь к базе
+\c comfort_db
+
+-- Создайте таблицу партнеров
+CREATE TABLE partners (
+    id SERIAL PRIMARY KEY,
+    type_company VARCHAR(50),
+    name VARCHAR(100),
+    address VARCHAR(200),
+    inn VARCHAR(20),
+    director_name VARCHAR(100),
+    tel VARCHAR(20),
+    email VARCHAR(100)
+);
+Шаг 3. Создание проекта Electron
+Откройте командную строку в папке, где хотите создать проект.
+Выполните команды:
+bash
+Копировать код
+mkdir comfort-system
+cd comfort-system
+npm init -y
+npm install electron pg --save
+Создайте структуру папок и файлов:
+bash
+Копировать код
+# В папке comfort-system создайте файлы:
+touch main.js index.html renderer.js styles.css resources/logo.png resources/icon.ico
+или вручную создайте эти файлы через проводник/текстовый редактор.
+
+Шаг 4. Вставьте код в файлы
+4.1 package.json — добавьте скрипт запуска
+Откройте package.json и замените содержимое на:
+
+json
+Копировать код
+{
+  "name": "comfort-system",
+  "version": "1.0.0",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "dependencies": {
+    "electron": "^latest",
+    "pg": "^latest"
+  }
+}
+4.2 main.js — главный процесс Electron
+Вставьте следующий код:
+
+js
+Копировать код
+const { app, BrowserWindow } = require('electron');
+const path = require('path');
+
+function createWindow() {
+  const win = new BrowserWindow({
+    width: 1000,
+    height: 700,
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false,
+    },
+    icon: path.join(__dirname, 'resources', 'icon.ico')
+  });
+
+  win.loadFile('index.html');
+}
+
+app.whenReady().then(createWindow);
+
+app.on('window-all-closed', () => {
+  if (process.platform !== 'darwin') app.quit();
+});
+4.3 index.html — интерфейс пользователя
+Вставьте следующий код:
+
+html
+Копировать код
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8" />
+<title>Система управления «Комфорт»</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<header>
+  <img src="resources/logo.png" alt="Логотип" style="height:50px;"/>
+  <h1>Система управления компанией «Комфорт»</h1>
+</header>
+
+<main>
+<section id="partners-section">
+<h2>Партнеры</h2>
+<form id="addPartnerForm">
+  <label>Тип:</label><input type="text" id="partnerType" required /><br/>
+  <label>Наименование:</label><input type="text" id="partnerName" required /><br/>
+  <label>Юридический адрес:</label><input type="text" id="partnerAddress" /><br/>
+  <label>ИНН:</label><input type="text" id="partnerINN" /><br/>
+  <label>ФИО директора:</label><input type="text" id="partnerDirector" /><br/>
+  <label>Телефон:</label><input type="text" id="partnerPhone" /><br/>
+  <label>Email:</label><input type="email" id="partnerEmail" /><br/>
+  <button type="submit">Добавить партнера</button>
+</form>
+<div id="partnersList"></div>
+</section>
+</main>
+
+<script src="renderer.js"></script>
+</body>
+</html>
+4.4 styles.css — стиль оформления
+Вставьте:
+
+css
+Копировать код
+body {
+    font-family: 'Candara', sans-serif;
+    background-color: #FFFFFF;
+    color: #000000;
+    margin:0;
+    padding:0;
+}
+header {
+    background-color: #D2DFFF;
+    padding:10px;
+    display:flex;
+    align-items:center;
+}
+header h1 {
+    margin-left:10px;
+}
+button {
+    background-color: #355CBD;
+    color:#fff;
+    border:none;
+    padding:8px 16px;
+    cursor:pointer;
+}
+button:hover {
+    opacity:0.9;
+}
+form input {
+    margin-bottom:5px;
+}
+#partnersList p {
+    margin:5px 0;
+}
+4.5 renderer.js — логика взаимодействия с базой данных
+Вставьте следующий код:
+
+js
+Копировать код
+const { Client } = require('pg');
+
+const client = new Client({
+    user: 'ваш_пользователь', // замените на ваши данные PostgreSQL
+    host: 'localhost',
+    database: 'comfort_db',
+    password: 'ваш_пароль', // замените на ваш пароль
+    port: 5432,
+});
+
+client.connect().then(() => {
+    console.log('Подключено к базе данных');
+    loadPartners();
+}).catch(err => {
+    console.error('Ошибка подключения:', err);
+});
+
+// Обработка формы добавления партнера
+document.getElementById('addPartnerForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const type = document.getElementById('partnerType').value.trim();
+    const name = document.getElementById('partnerName').value.trim();
+    const address = document.getElementById('partnerAddress').value.trim();
+    const inn = document.getElementById('partnerINN').value.trim();
+    const director = document.getElementById('partnerDirector').value.trim();
+    const tel = document.getElementById('partnerPhone').value.trim();
+    const email = document.getElementById('partnerEmail').value.trim();
+
+    try {
+        await client.query(
+            `INSERT INTO partners (type_company, name, address, inn, director_name, tel, email)
+             VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+            [type, name, address, inn, director, tel, email]
+        );
+        alert('Партнер добавлен');
+        loadPartners();
+        document.getElementById('addPartnerForm').reset();
+        } catch(err) {
+            console.error(err);
+            alert('Ошибка при добавлении партнера');
+        }
+});
+
+// Функция загрузки партнеров из базы и отображения их на странице
+async function loadPartners() {
+   try {
+       const res = await client.query('SELECT * FROM partners');
+       const listDiv = document.getElementById('partnersList');
+       listDiv.innerHTML = '';
+       res.rows.forEach(partner => {
+           listDiv.innerHTML += `<p>ID:${partner.id} | ${partner.name} (${partner.type_company})</p>`;
+       });
+   } catch(err) {
+       console.error(err);
+   }
+}
+Шаг 5. Запуск системы
+В папке проекта откройте командную строку.
+Выполните команду для запуска:
+bash
+Копировать код
+npm start
+Если всё сделано правильно — откроется окно с интерфейсом.
+
+Что делать дальше?
+Чтобы добавить новые разделы (заявки, производство и т.д.), повторяйте шаги по созданию форм и функций в index.html и renderer.js.
+Для хранения изображений используйте папку resources, а пути указывайте в базе данных.
+Для автоматизации процессов используйте таймеры или планировщики внутри Electron или сервера.
+Если потребуется помощь с расширением системы или возникнут вопросы — пишите!
